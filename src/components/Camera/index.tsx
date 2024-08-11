@@ -151,7 +151,6 @@ const AvailableRecordings = ({ intervals, changeStream }: AvailableRecordingsPro
         const start = r[0]
         const end = r[1]
         setQueryParams('?camera_id=' + params.id + '&start=' + start + '&end=' + end)
-        console.log(queryParams)
     }
 
     const streamRecord = async (r: segment, idx: number) => {

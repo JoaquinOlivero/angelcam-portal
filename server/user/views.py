@@ -5,9 +5,8 @@ from rest_framework import status
 import requests
 from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.db import IntegrityError
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from datetime import datetime, timedelta
-import time
 
 User = get_user_model()
 
@@ -79,7 +78,7 @@ class SharedCamerasView(APIView):
             if r.status_code == 200:
                 data = r.json()
                 return Response({
-                    'shared-cameras': data,
+                    'cameras': data,
                 })
             else:
                 # Handle error from angelcam's api
@@ -97,40 +96,105 @@ class SharedCameraRecordingsView(APIView):
         user = request.user
         token, _ = Token.objects.get_or_create(user=user)
         try:
-            # Get starting and end recording times.
-            r = requests.get("https://api.angelcam.com/v1/shared-cameras/"+camera_id+"/recording/", headers={
+          
+            camera = requests.get("https://api.angelcam.com/v1/shared-cameras/"+camera_id+"/", headers={
                 'Authorization': 'PersonalAccessToken ' + token.key
-            })
+            })            
 
-            if r.status_code == 200:
-                recording_data = r.json()
-                start = recording_data['recording_start']
-                end = recording_data['recording_end']
-                
-                interval_pairs = get_daily_interval_pairs(start, end)
-                # records = []
+            if camera.status_code == 200:
+                camera_data = camera.json()
 
-                # for start, end in interval_pairs:
-                #     r = requests.get("https://api.angelcam.com/v1/shared-cameras/"+camera_id+"/recording/timeline/?start="+start+"&end="+end, headers={
-                #         'Authorization': 'PersonalAccessToken ' + token.key
-                #     })
-                #     data = r.json()
-                #     records.append(data)
-                #     time.sleep(0.25)
-                
-                return Response({
-                    'recordings': recording_data,
-                    'interval_pairs': interval_pairs
-                })
+                if camera_data['has_recording']:
+                    # Get starting and end recording times.
+                    r = requests.get("https://api.angelcam.com/v1/shared-cameras/"+camera_id+"/recording/", headers={
+                        'Authorization': 'PersonalAccessToken ' + token.key
+                    })
+                    if r.status_code == 200:
+                        recording_data = r.json()
+                        start = recording_data['recording_start']
+                        end = recording_data['recording_end']
+                        
+                        interval_pairs = get_daily_interval_pairs(start, end)
+
+                        return Response({
+                            'camera': camera_data,
+                            'interval_pairs': interval_pairs
+                        })
+                    else:
+                        # Handle error from angelcam's api
+                        error = r.json()
+                        error['angelcam'] = True
+                        return Response({"error": error}, status=r.status_code)        
+                else:
+                    return Response({
+                        'camera': camera_data,
+                    })
             else:
                 # Handle error from angelcam's api
-                error = r.json()
+                error = camera.json()
                 error['angelcam'] = True
-                return Response({"error": error}, status=r.status_code)
+                return Response({"error": error}, status=camera.status_code)
         
         except Exception as e:
             # Handle unexpected errors
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class SharedCameraRecordsView(APIView):
+    def get(self, request):
+        user = request.user
+        token, _ = Token.objects.get_or_create(user=user)
+        start = request.query_params['start']
+        end = request.query_params['end']
+        camera_id = request.query_params['camera_id']
+        
+        try:
+            r = requests.get("https://api.angelcam.com/v1/shared-cameras/"+camera_id+"/recording/timeline/?start="+start+"&end="+end, headers={
+                'Authorization': 'PersonalAccessToken ' + token.key
+            })
+
+            data = r.json()
+
+            if r.status_code == 200:
+                return Response({
+                    'records': data
+                })
+            else:
+                # Handle error from angelcam's api
+                error = data.json()
+                error['angelcam'] = True
+                return Response({"error": error}, status=r.status_code)
+        except Exception as e:
+            # Handle unexpected errors
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+class SharedCameraStreamRecordingView(APIView):
+    def get(self, request):
+        user = request.user
+        token, _ = Token.objects.get_or_create(user=user)
+        start = request.query_params['start']
+        end = request.query_params['end']
+        camera_id = request.query_params['camera_id']
+
+        try:
+            r = requests.get("https://api.angelcam.com/v1/shared-cameras/"+camera_id+"/recording/stream/?start="+start+"&end="+end, headers={
+                'Authorization': 'PersonalAccessToken ' + token.key,
+                'Accept': 'application/json'
+            })
+            data = r.json()
+            
+            if r.status_code == 200:
+                return Response({
+                    'stream': data
+                })
+            else:
+                # Handle error from angelcam's api
+                error = data.json()
+                error['angelcam'] = True
+                return Response({"error": error}, status=r.status_code)
+        except Exception as e:
+            # Handle unexpected errors
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 def get_daily_interval_pairs(start_time, end_time):
     # Parse the input strings to datetime objects

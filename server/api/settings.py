@@ -1,9 +1,15 @@
+import environ
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# .env file in src directory.
+env = environ.Env()
+env.read_env(env.str('ENV_PATH', '../src/.env'))
 
+API = env('NEXT_PUBLIC_API')
+PORT =  env('FRONTEND_PORT')
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
@@ -16,7 +22,7 @@ DEBUG = True
 ALLOWED_HOSTS = ["*"]
 CORS_ORIGIN_ALLOW_ALL = True
 CORS_ALLOW_CREDENTIALS = True
-CSRF_TRUSTED_ORIGINS = ['http://*', 'https://*']
+CSRF_TRUSTED_ORIGINS = [API + PORT]
 
 # Application definition
 

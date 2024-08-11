@@ -130,8 +130,6 @@ const AvailableRecordings = ({ intervals, changeStream }: AvailableRecordingsPro
     //@ts-ignore
     const { error, isLoading } = useSWR<records>([process.env.NEXT_PUBLIC_API! + process.env.NEXT_PUBLIC_API_PORT + '/api/user/recordings/', queryParams], ([url, queryParams]) => fetcher(url, queryParams),
         {
-            revalidateIfStale: false,
-            revalidateOnFocus: false,
             refreshInterval: 0,
             onSuccess: (data) => {
                 const segments: segment[] = []
@@ -146,13 +144,14 @@ const AvailableRecordings = ({ intervals, changeStream }: AvailableRecordingsPro
         }
     )
 
-    const getRecords = async (r: string[], idx: number) => {
+    const getRecords = (r: string[], idx: number) => {
         setStreamId(null)
         setRecordDate(idx)
         setAvailableRecordings([])
         const start = r[0]
         const end = r[1]
         setQueryParams('?camera_id=' + params.id + '&start=' + start + '&end=' + end)
+        console.log(queryParams)
     }
 
     const streamRecord = async (r: segment, idx: number) => {
